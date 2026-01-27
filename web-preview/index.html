@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BALDE X | Official Preview</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;900&family=Roboto:wght@300;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="app-container">
+        <div id="splash-screen">
+            <div class="logo-container">
+                <h1 class="logo-text">BALDE <span class="x-highlight">X</span></h1>
+                <div class="glow-effect"></div>
+            </div>
+            <div class="loader-wrapper">
+                <div id="progress-bar"></div>
+                <p id="loading-status">CHARGING ASSETS...</p>
+            </div>
+        </div>
+
+        <main id="lobby-ui" style="display: none;">
+            <nav class="top-bar">
+                <div class="currency"><img src="coin.png"> 15,250</div>
+                <div class="diamonds"><img src="gem.png"> 420</div>
+            </nav>
+            
+            <div class="character-preview">
+                </div>
+
+            <div class="side-menu">
+                <button class="menu-item">STORE</button>
+                <button class="menu-item">LUCK ROYALE</button>
+                <button class="menu-item">VAULT</button>
+            </div>
+
+            <button id="start-btn">START MATCH</button>
+        </main>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>
