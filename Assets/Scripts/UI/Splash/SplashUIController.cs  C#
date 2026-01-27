@@ -1,0 +1,64 @@
+using UnityEngine;
+using UnityEngine.UI;
+using UnityEngine.SceneManagement;
+using System.Collections;
+using TMPro;
+using DG.Tweening; // Utilisation de DOTween pour des animations fluides professionnelles
+
+namespace BaldeX.UI.Splash {
+    public class SplashUIController : MonoBehaviour {
+        [Header("UI Components")]
+        [SerializeField] private CanvasGroup logoGroup;
+        [SerializeField] private RectTransform logoTransform;
+        [SerializeField] private Slider loadingBar;
+        [SerializeField] private TextMeshProUGUI statusText;
+        [SerializeField] private TextMeshProUGUI versionText;
+
+        [Header("Settings")]
+        [SerializeField] private string nextSceneName = "LobbyScene";
+        [SerializeField] private float minSplashTime = 3.5f;
+
+        private void Start() {
+            // Initialisation propre
+            versionText.text = "v" + Application.version;
+            loadingBar.value = 0;
+            logoGroup.alpha = 0;
+            logoTransform.localScale = Vector3.one * 0.8f;
+
+            StartCoroutine(PerformOpeningSequence());
+        }
+
+        private IEnumerator PerformOpeningSequence() {
+            // 1. Animation du Logo (Apparition néon)
+            statusText.text = "INITIALIZING BALDE X...";
+            
+            logoGroup.DOFade(1f, 1.5f);
+            logoTransform.DOScale(1.1f, 2f).SetEase(Ease.OutBack);
+            
+            yield return new WaitForSeconds(1f);
+
+            // 2. Simulation de vérification des ressources (Obscurcissement des détails techniques)
+            float progress = 0;
+            while (progress < 1f) {
+                progress += Time.deltaTime / minSplashTime;
+                loadingBar.value = progress;
+
+                if (progress < 0.3f) statusText.text = "CONNECTING TO SERVERS...";
+                else if (progress < 0.6f) statusText.text = "LOADING CHARACTER MODELS...";
+                else if (progress < 0.9f) statusText.text = "OPTIMIZING SHADERS...";
+                else statusText.text = "WELCOME TO BALDE X";
+
+                yield return null;
+            }
+
+            // 3. Transition vers le Lobby
+            TransitionToLobby();
+        }
+
+        private void TransitionToLobby() {
+            logoGroup.DOFade(0f, 0.5f).OnComplete(() => {
+                SceneManager.LoadSceneAsync(nextSceneName);
+            });
+        }
+    }
+}
