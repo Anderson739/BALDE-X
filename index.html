@@ -1,164 +1,164 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Mini Free Fire 3D - Three.js</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Free Fire Mobile Clone</title>
     <style>
-        body { margin: 0; overflow: hidden; font-family: sans-serif; }
-        #ui {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            color: white;
-            text-shadow: 2px 2px 4px #000;
-            pointer-events: none;
+        body { margin: 0; overflow: hidden; background: #000; touch-action: none; font-family: 'Arial', sans-serif; }
+        #ui-layer { position: absolute; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
+        
+        /* Joysticks */
+        #joystick-left { position: absolute; bottom: 50px; left: 50px; width: 120px; height: 120px; pointer-events: auto; }
+        #joystick-right { position: absolute; bottom: 50px; right: 50px; width: 120px; height: 120px; pointer-events: auto; }
+
+        /* Boutons d'action */
+        .action-btn { 
+            position: absolute; pointer-events: auto; background: rgba(255,255,255,0.3); 
+            border: 2px solid white; color: white; border-radius: 50%; width: 60px; height: 60px;
+            display: flex; align-items: center; justify-content: center; font-weight: bold;
         }
-        #crosshair {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 20px;
-            height: 20px;
-            border: 2px solid white;
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
-        }
+        #btn-shoot { bottom: 180px; right: 60px; width: 80px; height: 80px; background: rgba(255,0,0,0.5); }
+        #btn-jump { bottom: 100px; right: 160px; }
+        #btn-gloo { bottom: 30px; left: 50%; transform: translateX(-50%); width: 70px; height: 70px; background: rgba(0, 150, 255, 0.5); }
+
+        /* Stats */
+        #stats { position: absolute; top: 10px; left: 10px; color: yellow; font-size: 18px; text-shadow: 2px 2px #000; }
+        #crosshair { position: absolute; top: 50%; left: 50%; width: 15px; height: 15px; border: 2px solid #0f0; border-radius: 50%; transform: translate(-50%, -50%); }
     </style>
 </head>
 <body>
 
-<div id="ui">
-    <h1>FREE FIRE JS</h1>
-    <p>Z, Q, S, D pour bouger | Espace pour sauter | Clic pour tirer</p>
-    <p>Score: <span id="score">0</span></p>
+<div id="ui-layer">
+    <div id="stats">Vie: <span id="hp">100</span> | Score: <span id="score">0</span><br>Arme: <span id="weapon">Poings</span></div>
+    <div id="crosshair"></div>
+    <div id="joystick-left"></div>
+    <div id="joystick-right"></div>
+    <button id="btn-shoot" class="action-btn">TIR</button>
+    <button id="btn-jump" class="action-btn">SAUT</button>
+    <button id="btn-gloo" class="action-btn">GLOO</button>
 </div>
-<div id="crosshair"></div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.1/nipplejs.min.js"></script>
 <script type="importmap">
-    {
-        "imports": {
-            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
-        }
-    }
+    { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
 </script>
 
 <script type="module">
     import * as THREE from 'three';
 
-    // --- CONFIGURATION DE BASE ---
+    // --- INITIALISATION ---
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x87ceeb); // Ciel bleu
-    scene.fog = new THREE.Fog(0x87ceeb, 10, 50);
-
+    scene.background = new THREE.Color(0x87ceeb);
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    // Lumières
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-    scene.add(ambientLight);
-    const sunLight = new THREE.DirectionalLight(0xffffff, 1);
-    sunLight.position.set(10, 20, 10);
-    scene.add(sunLight);
+    const ambient = new THREE.AmbientLight(0xffffff, 0.7);
+    scene.add(ambient);
 
-    // --- LE SOL (LA MAP) ---
-    const floorGeometry = new THREE.PlaneGeometry(100, 100);
-    const floorMaterial = new THREE.MeshLambertMaterial({ color: 0x348C31 }); // Herbe
-    const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-    floor.rotation.x = -Math.PI / 2;
+    // --- VARIABLES DE JEU ---
+    let hp = 100, score = 0, hasWeapon = false;
+    const moveData = { forward: 0, turn: 0 };
+    const enemies = [], items = [], glooWalls = [];
+
+    // --- LE MONDE ---
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshLambertMaterial({ color: 0x44aa44 }));
+    floor.rotation.x = -Math.PI/2;
     scene.add(floor);
 
-    // --- LE JOUEUR ---
-    const playerGroup = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1, 0.5), new THREE.MeshLambertMaterial({ color: 0xff0000 }));
-    body.position.y = 0.5;
-    playerGroup.add(body);
-    scene.add(playerGroup);
-    
-    camera.position.set(0, 1.6, 3); // Position type "Third Person"
-    playerGroup.add(camera);
-
-    // --- CIBLES (ENNEMIS) ---
-    const enemies = [];
-    function createEnemy() {
-        const mesh = new THREE.Mesh(
-            new THREE.BoxGeometry(1, 2, 1),
-            new THREE.MeshLambertMaterial({ color: 0x0000ff })
-        );
-        mesh.position.set(Math.random() * 40 - 20, 1, Math.random() * 40 - 20);
-        scene.add(mesh);
-        enemies.push(mesh);
+    // Décor : Maisons simples
+    function createHouse(x, z) {
+        const house = new THREE.Mesh(new THREE.BoxGeometry(8, 6, 8), new THREE.MeshLambertMaterial({ color: 0x8B4513 }));
+        house.position.set(x, 3, z);
+        scene.add(house);
     }
-    for(let i=0; i<10; i++) createEnemy();
+    createHouse(15, 15); createHouse(-20, 10);
 
-    // --- CONTRÔLES ---
-    const keys = {};
-    let score = 0;
-    let canJump = true;
-    let velocityY = 0;
+    // Armes et Kits au sol
+    function createItem(type, x, z) {
+        const color = type === 'gun' ? 0xffff00 : 0xff00ff;
+        const item = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshBasicMaterial({ color }));
+        item.position.set(x, 0.5, z);
+        item.userData = { type };
+        scene.add(item);
+        items.push(item);
+    }
+    createItem('gun', 5, 5); createItem('kit', -5, -5);
 
-    document.addEventListener('keydown', (e) => keys[e.code] = true);
-    document.addEventListener('keyup', (e) => keys[e.code] = false);
-    
-    // Tir
-    window.addEventListener('mousedown', () => {
-        // Raycaster pour détecter si on touche un ennemi
-        const raycaster = new THREE.Raycaster();
-        const direction = new THREE.Vector3();
-        camera.getWorldDirection(direction);
-        raycaster.set(playerGroup.position, direction);
+    // --- LE JOUEUR ---
+    const player = new THREE.Group();
+    player.position.y = 0;
+    scene.add(player);
+    camera.position.set(0, 2, 4);
+    player.add(camera);
 
-        const intersects = raycaster.intersectObjects(enemies);
-        if (intersects.length > 0) {
-            const target = intersects[0].object;
-            target.position.set(Math.random() * 40 - 20, 1, Math.random() * 40 - 20); // Respawn
-            score++;
-            document.getElementById('score').innerText = score;
-        }
+    // --- CONTROLES TACTILES (NippleJS) ---
+    const joyLeft = nipplejs.create({ zone: document.getElementById('joystick-left'), mode: 'static', position: {left: '60px', bottom: '60px'}, color: 'white' });
+    joyLeft.on('move', (e, data) => {
+        moveData.forward = Math.sin(data.angle.radians) * data.distance / 50;
+        moveData.side = Math.cos(data.angle.radians) * data.distance / 50;
+    });
+    joyLeft.on('end', () => { moveData.forward = 0; moveData.side = 0; });
+
+    const joyRight = nipplejs.create({ zone: document.getElementById('joystick-right'), mode: 'static', position: {right: '60px', bottom: '60px'}, color: 'red' });
+    joyRight.on('move', (e, data) => {
+        player.rotation.y -= data.force * (data.vector.x * 0.05);
     });
 
-    // --- BOUCLE D'ANIMATION ---
-    function animate() {
-        requestAnimationFrame(animate);
-
-        const speed = 0.1;
-        // Déplacement relatif à la rotation
-        if (keys['KeyW']) playerGroup.translateZ(-speed);
-        if (keys['KeyS']) playerGroup.translateZ(speed);
-        if (keys['KeyA']) playerGroup.translateX(-speed);
-        if (keys['KeyD']) playerGroup.translateX(speed);
-
-        // Rotation de la souris (simplifiée via touches pour cet exemple)
-        if (keys['ArrowLeft']) playerGroup.rotation.y += 0.05;
-        if (keys['ArrowRight']) playerGroup.rotation.y -= 0.05;
-
-        // Physique de saut (Gravité)
-        if (keys['Space'] && canJump) {
-            velocityY = 0.15;
-            canJump = false;
+    // --- ACTIONS ---
+    document.getElementById('btn-shoot').onclick = () => {
+        const raycaster = new THREE.Raycaster();
+        const dir = new THREE.Vector3();
+        camera.getWorldDirection(dir);
+        raycaster.set(player.position, dir);
+        const hit = raycaster.intersectObjects(enemies);
+        if(hit.length > 0) {
+            scene.remove(hit[0].object);
+            score += 10;
+            document.getElementById('score').innerText = score;
         }
+    };
+
+    document.getElementById('btn-gloo').onclick = () => {
+        const wall = new THREE.Mesh(new THREE.BoxGeometry(3, 2, 0.2), new THREE.MeshStandardMaterial({ color: 0x00ffff, transparent: true, opacity: 0.7 }));
+        const offset = new THREE.Vector3(0, 1, -2);
+        offset.applyQuaternion(player.quaternion);
+        wall.position.copy(player.position).add(offset);
+        wall.rotation.copy(player.rotation);
+        scene.add(wall);
+    };
+
+    // --- BOUCLE DE JEU ---
+    function update() {
+        requestAnimationFrame(update);
         
-        playerGroup.position.y += velocityY;
-        if (playerGroup.position.y > 0) {
-            velocityY -= 0.008; // Gravité
-        } else {
-            playerGroup.position.y = 0;
-            velocityY = 0;
-            canJump = true;
-        }
+        // Déplacement
+        player.translateZ(-moveData.forward * 0.1);
+        player.translateX(moveData.side * 0.1);
+
+        // Collision Items
+        items.forEach((item, i) => {
+            if(player.position.distanceTo(item.position) < 1.5) {
+                if(item.userData.type === 'gun') { hasWeapon = true; document.getElementById('weapon').innerText = "AK-47"; }
+                if(item.userData.type === 'kit') { hp = 100; document.getElementById('hp').innerText = hp; }
+                scene.remove(item);
+                items.splice(i, 1);
+            }
+        });
 
         renderer.render(scene, camera);
     }
 
-    // Gestion redimensionnement fenêtre
-    window.addEventListener('resize', () => {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-    });
+    // Spawn ennemis
+    setInterval(() => {
+        const enemy = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), new THREE.MeshLambertMaterial({ color: 0xff0000 }));
+        enemy.position.set(Math.random()*40-20, 1, Math.random()*40-20);
+        scene.add(enemy);
+        enemies.push(enemy);
+    }, 5000);
 
-    animate();
+    update();
 </script>
 </body>
 </html>
