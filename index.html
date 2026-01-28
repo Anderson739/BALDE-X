@@ -1,43 +1,164 @@
-<!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BALDE X | Official Preview</title>
-    <link rel="stylesheet" href="styles.css">
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;900&family=Roboto:wght@300;700&display=swap" rel="stylesheet">
+    <title>Mini Free Fire 3D - Three.js</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: sans-serif; }
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            text-shadow: 2px 2px 4px #000;
+            pointer-events: none;
+        }
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 20px;
+            height: 20px;
+            border: 2px solid white;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+        }
+    </style>
 </head>
 <body>
-    <div id="app-container">
-        <div id="splash-screen">
-            <div class="logo-container">
-                <h1 class="logo-text">BALDE <span class="x-highlight">X</span></h1>
-                <div class="glow-effect"></div>
-            </div>
-            <div class="loader-wrapper">
-                <div id="progress-bar"></div>
-                <p id="loading-status">CHARGING ASSETS...</p>
-            </div>
-        </div>
 
-        <main id="lobby-ui" style="display: none;">
-            <nav class="top-bar">
-                <div class="currency"><img src="coin.png"> 15,250</div>
-                <div class="diamonds"><img src="gem.png"> 420</div>
-            </nav>
-            
-            <div class="character-preview">
-                </div>
+<div id="ui">
+    <h1>FREE FIRE JS</h1>
+    <p>Z, Q, S, D pour bouger | Espace pour sauter | Clic pour tirer</p>
+    <p>Score: <span id="score">0</span></p>
+</div>
+<div id="crosshair"></div>
 
-            <div class="side-menu">
-                <button class="menu-item">STORE</button>
-                <button class="menu-item">LUCK ROYALE</button>
-                <button class="menu-item">VAULT</button>
-            </div>
+<script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+    }
+</script>
 
-            <button id="start-btn">START MATCH</button>
-        </main>
-    </div>
-    <script src="app.js"></script>
+<script type="module">
+    import * as THREE from 'three';
+
+    // --- CONFIGURATION DE BASE ---
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x87ceeb); // Ciel bleu
+    scene.fog = new THREE.Fog(0x87ceeb, 10, 50);
+
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    // Lumières
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambientLight);
+    const sunLight = new THREE.DirectionalLight(0xffffff, 1);
+    sunLight.position.set(10, 20, 10);
+    scene.add(sunLight);
+
+    // --- LE SOL (LA MAP) ---
+    const floorGeometry = new THREE.PlaneGeometry(100, 100);
+    const floorMaterial = new THREE.MeshLambertMaterial({ color: 0x348C31 }); // Herbe
+    const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+    floor.rotation.x = -Math.PI / 2;
+    scene.add(floor);
+
+    // --- LE JOUEUR ---
+    const playerGroup = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1, 0.5), new THREE.MeshLambertMaterial({ color: 0xff0000 }));
+    body.position.y = 0.5;
+    playerGroup.add(body);
+    scene.add(playerGroup);
+    
+    camera.position.set(0, 1.6, 3); // Position type "Third Person"
+    playerGroup.add(camera);
+
+    // --- CIBLES (ENNEMIS) ---
+    const enemies = [];
+    function createEnemy() {
+        const mesh = new THREE.Mesh(
+            new THREE.BoxGeometry(1, 2, 1),
+            new THREE.MeshLambertMaterial({ color: 0x0000ff })
+        );
+        mesh.position.set(Math.random() * 40 - 20, 1, Math.random() * 40 - 20);
+        scene.add(mesh);
+        enemies.push(mesh);
+    }
+    for(let i=0; i<10; i++) createEnemy();
+
+    // --- CONTRÔLES ---
+    const keys = {};
+    let score = 0;
+    let canJump = true;
+    let velocityY = 0;
+
+    document.addEventListener('keydown', (e) => keys[e.code] = true);
+    document.addEventListener('keyup', (e) => keys[e.code] = false);
+    
+    // Tir
+    window.addEventListener('mousedown', () => {
+        // Raycaster pour détecter si on touche un ennemi
+        const raycaster = new THREE.Raycaster();
+        const direction = new THREE.Vector3();
+        camera.getWorldDirection(direction);
+        raycaster.set(playerGroup.position, direction);
+
+        const intersects = raycaster.intersectObjects(enemies);
+        if (intersects.length > 0) {
+            const target = intersects[0].object;
+            target.position.set(Math.random() * 40 - 20, 1, Math.random() * 40 - 20); // Respawn
+            score++;
+            document.getElementById('score').innerText = score;
+        }
+    });
+
+    // --- BOUCLE D'ANIMATION ---
+    function animate() {
+        requestAnimationFrame(animate);
+
+        const speed = 0.1;
+        // Déplacement relatif à la rotation
+        if (keys['KeyW']) playerGroup.translateZ(-speed);
+        if (keys['KeyS']) playerGroup.translateZ(speed);
+        if (keys['KeyA']) playerGroup.translateX(-speed);
+        if (keys['KeyD']) playerGroup.translateX(speed);
+
+        // Rotation de la souris (simplifiée via touches pour cet exemple)
+        if (keys['ArrowLeft']) playerGroup.rotation.y += 0.05;
+        if (keys['ArrowRight']) playerGroup.rotation.y -= 0.05;
+
+        // Physique de saut (Gravité)
+        if (keys['Space'] && canJump) {
+            velocityY = 0.15;
+            canJump = false;
+        }
+        
+        playerGroup.position.y += velocityY;
+        if (playerGroup.position.y > 0) {
+            velocityY -= 0.008; // Gravité
+        } else {
+            playerGroup.position.y = 0;
+            velocityY = 0;
+            canJump = true;
+        }
+
+        renderer.render(scene, camera);
+    }
+
+    // Gestion redimensionnement fenêtre
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    animate();
+</script>
 </body>
 </html>
